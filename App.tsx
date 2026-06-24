@@ -228,6 +228,7 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null);
   const [toast, setToast] = useState('');
@@ -257,6 +258,41 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
     setPaymentModalOpen(true);
   }
 
+  function updateDebt(nextDebt: Debt) {
+    const normalized = normalizeDebt(nextDebt);
+    const now = new Date().toISOString();
+    updateData({
+      ...data,
+      debts: data.debts.map((debt) => debt.id === normalized.id ? { ...normalized, updatedAt: now } : debt),
+      customers: data.customers.map((customer) => customer.id === normalized.customerId ? { ...customer, updatedAt: now } : customer)
+    }, 'Debt updated.');
+    setEditingDebt(null);
+  }
+
+  function confirmDeleteDebt(debt: Debt) {
+    const linkedPayments = data.payments.filter((payment) => payment.debtId === debt.id);
+    const message = linkedPayments.length
+      ? `This will remove "${debt.description}" and ${linkedPayments.length} linked payment record${linkedPayments.length === 1 ? '' : 's'}.`
+      : `This will remove "${debt.description}" from this customer.`;
+
+    Alert.alert('Delete this debt?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          const now = new Date().toISOString();
+          updateData({
+            ...data,
+            debts: data.debts.filter((item) => item.id !== debt.id),
+            payments: data.payments.filter((payment) => payment.debtId !== debt.id),
+            customers: data.customers.map((customer) => customer.id === debt.customerId ? { ...customer, updatedAt: now } : customer)
+          }, 'Debt deleted.');
+        }
+      }
+    ]);
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.appWrap}>
@@ -282,6 +318,8 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
               onAddDebt={() => openAddDebt(selectedCustomer.id)}
               onPayment={() => openPayment(selectedCustomer.id)}
               onEdit={() => setCustomerModalOpen(true)}
+              onEditDebt={setEditingDebt}
+              onDeleteDebt={confirmDeleteDebt}
             />
           ) : (
             <CustomersScreen
@@ -353,6 +391,11 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
           setPaymentModalOpen(false);
           if (preview) setReceiptPreview(preview);
         }}
+      />
+      <EditDebtModal
+        debt={editingDebt}
+        onClose={() => setEditingDebt(null)}
+        onSave={updateDebt}
       />
       <ReceiptPreviewModal
         preview={receiptPreview}
@@ -517,7 +560,9 @@ function CustomerDetail({
   onBack,
   onAddDebt,
   onPayment,
-  onEdit
+  onEdit,
+  onEditDebt,
+  onDeleteDebt
 }: {
   data: AppData;
   customer: CustomerSummary;
@@ -525,6 +570,8 @@ function CustomerDetail({
   onAddDebt: () => void;
   onPayment: () => void;
   onEdit: () => void;
+  onEditDebt: (debt: Debt) => void;
+  onDeleteDebt: (debt: Debt) => void;
 }) {
   const debts = data.debts.filter((debt) => debt.customerId === customer.id).map(normalizeDebt);
   const payments = data.payments.filter((payment) => payment.customerId === customer.id);
@@ -561,7 +608,14 @@ function CustomerDetail({
       </View>
 
       <SectionTitle title="Debts" />
-      {debts.length ? debts.map((debt) => <DebtDetailCard key={debt.id} debt={debt} />) : <EmptyInline title="No debt yet" body="Add what this customer owes and it will appear here." />}
+      {debts.length ? debts.map((debt) => (
+        <DebtDetailCard
+          key={debt.id}
+          debt={debt}
+          onEdit={() => onEditDebt(debt)}
+          onDelete={() => onDeleteDebt(debt)}
+        />
+      )) : <EmptyInline title="No debt yet" body="Add what this customer owes and it will appear here." />}
 
       <SectionTitle title="Payment History" />
       {payments.length ? payments.map((payment) => {
@@ -1009,6 +1063,103 @@ function PaymentModal({
   );
 }
 
+function EditDebtModal({
+  debt,
+  onClose,
+  onSave
+}: {
+  debt: Debt | null;
+  onClose: () => void;
+  onSave: (debt: Debt) => void;
+}) {
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [note, setNote] = useState('');
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+
+  useEffect(() => {
+    setDescription(debt?.description ?? '');
+    setAmount(debt ? String(debt.originalAmount) : '');
+    setDueDate(debt?.dueDate ?? '');
+    setNote(debt?.note ?? '');
+    setShowDueDatePicker(false);
+  }, [debt]);
+
+  if (!debt) return null;
+
+  const currentDebt = debt;
+  const nextAmount = parseMoney(amount);
+  const canSave = description.trim().length > 0 && nextAmount > 0;
+
+  function save() {
+    if (!canSave) return;
+    const clampedPaid = Math.min(currentDebt.amountPaid, nextAmount);
+    onSave(normalizeDebt({
+      ...currentDebt,
+      description: description.trim(),
+      originalAmount: nextAmount,
+      amountPaid: clampedPaid,
+      balance: Math.max(0, nextAmount - clampedPaid),
+      dueDate: dueDate || null,
+      note: note.trim()
+    }));
+  }
+
+  return (
+    <Sheet open={Boolean(debt)} title="Edit Debt" onClose={onClose}>
+      <FieldRow label="Description" value={description} onChangeText={setDescription} placeholder="Rice, POS withdrawal, Hair appointment" />
+      <FieldRow label="Original amount" value={amount} onChangeText={setAmount} placeholder="20000" keyboardType="numeric" />
+      {debt.amountPaid > 0 ? (
+        <Card style={styles.editWarningCard}>
+          <Ionicons name="information-circle" size={20} color={colors.amber} />
+          <View style={styles.rowCopy}>
+            <Text style={styles.optionTitle}>Payment already recorded</Text>
+            <Text style={styles.optionMeta}>
+              This debt has {formatNaira(debt.amountPaid)} paid. If you reduce the original amount below that, the debt will be marked cleared.
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+      <Text style={styles.fieldLabel}>Due date</Text>
+      <ChipRow
+        values={['None', 'Today', 'Tomorrow', '7 days', 'Custom']}
+        active={quickDateLabel(dueDate)}
+        onChange={(value) => {
+          if (value === 'Custom') {
+            setShowDueDatePicker(true);
+            setDueDate((current) => current || todayKey());
+            return;
+          }
+          setShowDueDatePicker(false);
+          setDueDate(dateFromQuickLabel(value));
+        }}
+      />
+      {dueDate ? (
+        <Pressable onPress={() => setShowDueDatePicker(true)} style={styles.dateSummary}>
+          <Ionicons name="calendar" size={18} color={colors.green} />
+          <Text style={styles.dateSummaryText}>Due {formatShortDate(dueDate)}</Text>
+          <Text style={styles.dateSummaryAction}>Change</Text>
+        </Pressable>
+      ) : null}
+      {showDueDatePicker ? (
+        <DateTimePicker
+          value={dueDate ? new Date(`${dueDate}T12:00:00`) : new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={(_, selectedDate) => {
+            if (Platform.OS !== 'ios') setShowDueDatePicker(false);
+            if (!selectedDate) return;
+            setDueDate(todayKey(selectedDate));
+          }}
+        />
+      ) : null}
+      <FieldRow label="Private note" value={note} onChangeText={setNote} placeholder="Only you will see this" multiline />
+      <Button label="Save Changes" icon="checkmark" disabled={!canSave} onPress={save} />
+    </Sheet>
+  );
+}
+
 function Sheet({ open, title, onClose, children }: React.PropsWithChildren<{ open: boolean; title: string; onClose: () => void }>) {
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose}>
@@ -1152,7 +1303,7 @@ function DebtRow({
   );
 }
 
-function DebtDetailCard({ debt }: { debt: Debt }) {
+function DebtDetailCard({ debt, onEdit, onDelete }: { debt: Debt; onEdit: () => void; onDelete: () => void }) {
   return (
     <Card style={styles.debtDetail}>
       <View style={styles.headerRowTight}>
@@ -1168,6 +1319,16 @@ function DebtDetailCard({ debt }: { debt: Debt }) {
         <MiniStat label="Balance" value={formatNaira(debt.balance)} danger={debt.status === 'Overdue'} />
       </View>
       {debt.note ? <Text style={styles.noteText}>{debt.note}</Text> : null}
+      <View style={styles.debtActionRow}>
+        <Pressable onPress={onEdit} style={styles.debtActionButton}>
+          <Ionicons name="create" size={16} color={colors.green} />
+          <Text style={styles.debtActionText}>Edit</Text>
+        </Pressable>
+        <Pressable onPress={onDelete} style={[styles.debtActionButton, styles.debtDeleteButton]}>
+          <Ionicons name="trash" size={16} color={colors.danger} />
+          <Text style={[styles.debtActionText, styles.debtDeleteText]}>Delete</Text>
+        </Pressable>
+      </View>
     </Card>
   );
 }
@@ -1705,6 +1866,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10
   },
+  debtActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    paddingTop: 12
+  },
+  debtActionButton: {
+    minHeight: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.greenMist,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6
+  },
+  debtDeleteButton: {
+    backgroundColor: colors.dangerSoft
+  },
+  debtActionText: {
+    color: colors.green,
+    fontSize: 13,
+    fontFamily: fonts.extraBold
+  },
+  debtDeleteText: {
+    color: colors.danger
+  },
   miniStat: {
     flex: 1,
     minHeight: 64,
@@ -1835,6 +2024,12 @@ const styles = StyleSheet.create({
   },
   receiptHintCard: {
     backgroundColor: colors.greenMist,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12
+  },
+  editWarningCard: {
+    backgroundColor: colors.amberSoft,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12
