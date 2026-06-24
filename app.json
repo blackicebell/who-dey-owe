@@ -16,10 +16,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.blackicebell.whodeyowe"
+      "bundleIdentifier": "com.blackicebell.whodeyowe",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.blackicebell.whodeyowe",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon-foreground-1024.png",
         "backgroundColor": "#0B3D2E"
