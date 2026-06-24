@@ -2,12 +2,10 @@
   <path d="M218 266C218 193.098 277.098 134 350 134H674C746.902 134 806 193.098 806 266V836H218V266Z" fill="#FFF7E8"/>
   <path d="M278 260C278 230.177 302.177 206 332 206H692C721.823 206 746 230.177 746 260V310H278V260Z" fill="#F4B400"/>
   <path d="M308 428H716" stroke="#146C43" stroke-width="36" stroke-linecap="round"/>
-  <path d="M308 535H652" stroke="#2E8B57" stroke-width="30" stroke-linecap="round" opacity="0.55"/>
-  <path d="M308 630H586" stroke="#2E8B57" stroke-width="30" stroke-linecap="round" opacity="0.42"/>
+  <text x="512" y="487" text-anchor="middle" fill="#146C43" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-size="164" font-weight="900" letter-spacing="-7">WDO</text>
   <circle cx="735" cy="698" r="154" fill="#F4B400"/>
   <path d="M735 584V794" stroke="#146C43" stroke-width="42" stroke-linecap="round"/>
   <path d="M681 636H789" stroke="#146C43" stroke-width="34" stroke-linecap="round"/>
   <path d="M681 743H789" stroke="#146C43" stroke-width="34" stroke-linecap="round"/>
   <circle cx="801" cy="274" r="78" fill="#D9534F"/>
-  <text x="512" y="487" text-anchor="middle" fill="#146C43" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-size="164" font-weight="900" letter-spacing="-7">WDO</text>
 </svg>

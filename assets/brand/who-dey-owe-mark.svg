@@ -1,14 +1,27 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" fill="#0B3D2E"/>
-  <circle cx="512" cy="512" r="358" fill="#FFF4D8" opacity="0.08"/>
-  <path d="M226 286C226 217.516 281.516 162 350 162H674C742.484 162 798 217.516 798 286V508C798 576.484 742.484 632 674 632H550L407 775C387.479 794.521 354 780.694 354 753.083V632H350C281.516 632 226 576.484 226 508V286Z" fill="#FFFDF8"/>
-  <circle cx="390" cy="391" r="57" fill="#F5A524"/>
-  <circle cx="512" cy="391" r="57" fill="#94B7A5"/>
-  <circle cx="634" cy="391" r="57" fill="#F5A524"/>
-  <path d="M512 284V509" stroke="#0B3D2E" stroke-width="38" stroke-linecap="round"/>
-  <path d="M455 338H569" stroke="#0B3D2E" stroke-width="32" stroke-linecap="round"/>
-  <path d="M455 454H569" stroke="#0B3D2E" stroke-width="32" stroke-linecap="round"/>
-  <path d="M681 694C681 635.458 728.458 588 787 588C845.542 588 893 635.458 893 694C893 752.542 845.542 800 787 800C728.458 800 681 752.542 681 694Z" fill="#F5A524"/>
-  <path d="M769 657C774.381 642.741 787.834 633 805.5 633C828.972 633 846 648.632 846 669.5C846 687.932 834.633 699.266 819.406 708.228C805.432 716.453 797 724.186 797 740" stroke="#0B3D2E" stroke-width="30" stroke-linecap="round"/>
-  <path d="M797 778H797.5" stroke="#0B3D2E" stroke-width="34" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="bg" x1="148" y1="98" x2="876" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E8B57"/>
+      <stop offset="1" stop-color="#146C43"/>
+    </linearGradient>
+    <filter id="shadow" x="164" y="164" width="730" height="746" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#073B25" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="820" cy="184" r="162" fill="#FFF7E8" opacity="0.08"/>
+  <circle cx="168" cy="820" r="220" fill="#FFF7E8" opacity="0.07"/>
+  <g filter="url(#shadow)">
+    <path d="M218 266C218 193.098 277.098 134 350 134H674C746.902 134 806 193.098 806 266V836H218V266Z" fill="#FFF7E8"/>
+    <path d="M278 260C278 230.177 302.177 206 332 206H692C721.823 206 746 230.177 746 260V310H278V260Z" fill="#F4B400"/>
+    <path d="M308 428H716" stroke="#146C43" stroke-width="36" stroke-linecap="round"/>
+    <path d="M308 535H652" stroke="#2E8B57" stroke-width="30" stroke-linecap="round" opacity="0.55"/>
+    <path d="M308 630H586" stroke="#2E8B57" stroke-width="30" stroke-linecap="round" opacity="0.42"/>
+  </g>
+  <circle cx="735" cy="698" r="154" fill="#F4B400"/>
+  <path d="M735 584V794" stroke="#146C43" stroke-width="42" stroke-linecap="round"/>
+  <path d="M681 636H789" stroke="#146C43" stroke-width="34" stroke-linecap="round"/>
+  <path d="M681 743H789" stroke="#146C43" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="801" cy="274" r="78" fill="#D9534F"/>
+  <text x="512" y="487" text-anchor="middle" fill="#146C43" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-size="164" font-weight="900" letter-spacing="-7">WDO</text>
 </svg>

@@ -1,16 +1,16 @@
 <svg width="1800" height="520" viewBox="0 0 1800 520" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1800" height="520" rx="96" fill="#FAF8F1"/>
-  <rect x="96" y="88" width="344" height="344" rx="88" fill="#0B3D2E"/>
-  <path d="M153 182C153 144.997 182.997 115 220 115H316C353.003 115 383 144.997 383 182V281C383 318.003 353.003 348 316 348H282L209 421C198.254 431.746 180 424.135 180 408.941V348C164.536 348 153 336.464 153 321V182Z" fill="#FFFDF8"/>
-  <circle cx="218" cy="235" r="24" fill="#F5A524"/>
-  <circle cx="268" cy="235" r="24" fill="#94B7A5"/>
-  <circle cx="318" cy="235" r="24" fill="#F5A524"/>
-  <path d="M268 189V294" stroke="#0B3D2E" stroke-width="18" stroke-linecap="round"/>
-  <path d="M243 214H293" stroke="#0B3D2E" stroke-width="15" stroke-linecap="round"/>
-  <path d="M243 268H293" stroke="#0B3D2E" stroke-width="15" stroke-linecap="round"/>
-  <circle cx="349" cy="343" r="47" fill="#F5A524"/>
-  <path d="M342 324C346 314 356 307 369 307C386 307 398 318 398 333C398 346 390 354 379 361C369 367 363 372 363 384" stroke="#0B3D2E" stroke-width="13" stroke-linecap="round"/>
-  <path d="M363 404H363.4" stroke="#0B3D2E" stroke-width="15" stroke-linecap="round"/>
-  <text x="500" y="246" fill="#0B3D2E" font-family="Arial, Helvetica, sans-serif" font-size="104" font-weight="800" letter-spacing="-2">Who Dey Owe?</text>
-  <text x="506" y="330" fill="#65706B" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">Know who owes you. Remind them fast.</text>
+  <rect width="1800" height="520" rx="96" fill="#FFF7E8"/>
+  <rect x="96" y="88" width="344" height="344" rx="88" fill="#146C43"/>
+  <path d="M158 164C158 127.549 187.549 98 224 98H312C348.451 98 378 127.549 378 164V420H158V164Z" fill="#FFF7E8"/>
+  <path d="M188 162C188 147.641 199.641 136 214 136H322C336.359 136 348 147.641 348 162V188H188V162Z" fill="#F4B400"/>
+  <path d="M204 246H332" stroke="#146C43" stroke-width="15" stroke-linecap="round"/>
+  <path d="M204 294H310" stroke="#2E8B57" stroke-width="13" stroke-linecap="round" opacity="0.58"/>
+  <text x="268" y="260" text-anchor="middle" fill="#146C43" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-size="54" font-weight="900" letter-spacing="-2">WDO</text>
+  <circle cx="356" cy="350" r="67" fill="#F4B400"/>
+  <path d="M356 300V400" stroke="#146C43" stroke-width="20" stroke-linecap="round"/>
+  <path d="M330 325H382" stroke="#146C43" stroke-width="16" stroke-linecap="round"/>
+  <path d="M330 376H382" stroke="#146C43" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="372" cy="146" r="36" fill="#D9534F"/>
+  <text x="500" y="246" fill="#146C43" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-size="104" font-weight="900" letter-spacing="-2">Who Dey Owe?</text>
+  <text x="506" y="330" fill="#65706B" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">Simple debt tracking for Nigerian traders</text>
 </svg>
