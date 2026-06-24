@@ -55,8 +55,6 @@ type CustomerDraft = {
 
 type DebtDraft = {
   customerId: string;
-  newCustomerName: string;
-  newCustomerPhone: string;
   description: string;
   amount: string;
   dueDate: string;
@@ -79,8 +77,6 @@ type ReceiptPreview = {
 const emptyCustomerDraft: CustomerDraft = { name: '', phone: '', notes: '' };
 const emptyDebtDraft: DebtDraft = {
   customerId: '',
-  newCustomerName: '',
-  newCustomerPhone: '',
   description: '',
   amount: '',
   dueDate: '',
@@ -229,12 +225,14 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null);
   const [toast, setToast] = useState('');
 
   const summaries = useMemo(() => getCustomerSummaries(data), [data]);
   const selectedCustomer = summaries.find((customer) => customer.id === selectedCustomerId) ?? null;
+  const editingCustomer = summaries.find((customer) => customer.id === editingCustomerId) ?? null;
   const activeDebts = data.debts.map(normalizeDebt).filter((debt) => debt.balance > 0);
   const totalOwed = activeDebts.reduce((sum, debt) => sum + debt.balance, 0);
 
@@ -249,12 +247,17 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
   }
 
   function openAddDebt(customerId?: string) {
-    if (customerId) setSelectedCustomerId(customerId);
+    setSelectedCustomerId(customerId ?? null);
     setDebtModalOpen(true);
   }
 
+  function openAddCustomer() {
+    setEditingCustomerId(null);
+    setCustomerModalOpen(true);
+  }
+
   function openPayment(customerId?: string) {
-    if (customerId) setSelectedCustomerId(customerId);
+    setSelectedCustomerId(customerId ?? null);
     setPaymentModalOpen(true);
   }
 
@@ -302,7 +305,7 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
             summaries={summaries}
             totalOwed={totalOwed}
             onAddDebt={() => openAddDebt()}
-            onAddCustomer={() => setCustomerModalOpen(true)}
+            onAddCustomer={openAddCustomer}
             onCustomerPress={(id) => {
               setSelectedCustomerId(id);
               setActiveTab('Customers');
@@ -317,14 +320,17 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
               onBack={() => setSelectedCustomerId(null)}
               onAddDebt={() => openAddDebt(selectedCustomer.id)}
               onPayment={() => openPayment(selectedCustomer.id)}
-              onEdit={() => setCustomerModalOpen(true)}
+              onEdit={() => {
+                setEditingCustomerId(selectedCustomer.id);
+                setCustomerModalOpen(true);
+              }}
               onEditDebt={setEditingDebt}
               onDeleteDebt={confirmDeleteDebt}
             />
           ) : (
             <CustomersScreen
               summaries={summaries}
-              onAddCustomer={() => setCustomerModalOpen(true)}
+              onAddCustomer={openAddCustomer}
               onCustomerPress={setSelectedCustomerId}
             />
           )
@@ -356,14 +362,18 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
 
       <CustomerModal
         open={customerModalOpen}
-        customer={selectedCustomer}
-        onClose={() => setCustomerModalOpen(false)}
+        customer={editingCustomer}
+        onClose={() => {
+          setCustomerModalOpen(false);
+          setEditingCustomerId(null);
+        }}
         onSave={(draft, editingCustomer, addDebtNext) => {
           const next = editingCustomer
             ? upsertCustomer(data, { ...editingCustomer, ...draft })
             : addCustomer(data, draft);
           updateData(next, editingCustomer ? 'Customer updated.' : 'Customer saved.');
           setCustomerModalOpen(false);
+          setEditingCustomerId(null);
           if (addDebtNext) {
             const customerId = editingCustomer?.id ?? next.customers[0]?.id;
             setSelectedCustomerId(customerId ?? null);
@@ -491,8 +501,9 @@ function HomeScreen({
       {recent.length ? recent.map((item) => {
         const isPayment = 'paymentDate' in item;
         const customer = summaries.find((summary) => summary.id === item.customerId);
+        if (!customer) return null;
         return (
-          <Card key={item.id} style={styles.recentRow}>
+          <Pressable key={item.id} onPress={() => onCustomerPress(customer.id)} style={({ pressed }) => [styles.recentRow, pressed && styles.pressed]}>
             <View style={[styles.smallIcon, isPayment && styles.smallIconSuccess]}>
               <Ionicons name={isPayment ? 'cash' : 'receipt'} size={18} color={isPayment ? colors.green : colors.amber} />
             </View>
@@ -500,7 +511,8 @@ function HomeScreen({
               <Text style={styles.rowTitle}>{isPayment ? 'Payment recorded' : (item as Debt).description}</Text>
               <Text style={styles.rowMeta}>{customer?.name ?? 'Customer'} · {isPayment ? formatNaira(item.amount) : formatNaira((item as Debt).balance)}</Text>
             </View>
-          </Card>
+            <Ionicons name="chevron-forward" size={18} color={colors.mutedText} />
+          </Pressable>
         );
       }) : <EmptyInline title="Nothing recent" body="Your latest debts and payments will show here." />}
     </ScrollView>
@@ -885,10 +897,6 @@ function DebtModal({
   function saveDebt() {
     let nextData = data;
     let customerId = draft.customerId;
-    if (!customerId && draft.newCustomerName.trim()) {
-      nextData = addCustomer(data, { name: draft.newCustomerName, phone: draft.newCustomerPhone, notes: '' });
-      customerId = nextData.customers[0].id;
-    }
     if (!customerId) return;
     onSave(addDebt(nextData, {
       customerId,
@@ -900,28 +908,16 @@ function DebtModal({
   }
 
   const amount = parseMoney(draft.amount);
-  const canSave = (draft.customerId || draft.newCustomerName.trim()) && draft.description.trim() && amount > 0;
+  const canSave = Boolean(draft.customerId) && draft.description.trim().length > 0 && amount > 0;
 
   return (
     <Sheet open={open} title="Add Debt" onClose={onClose}>
-      <Text style={styles.fieldLabel}>Customer</Text>
-      <View style={styles.customerPicker}>
-        {data.customers.map((customer) => (
-          <Pressable
-            key={customer.id}
-            onPress={() => setDraft((current) => ({ ...current, customerId: customer.id, newCustomerName: '' }))}
-            style={[styles.customerChip, draft.customerId === customer.id && styles.customerChipActive]}
-          >
-            <Text style={[styles.customerChipText, draft.customerId === customer.id && styles.customerChipTextActive]}>{customer.name}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {!draft.customerId ? (
-        <>
-          <FieldRow label="Or create new customer" value={draft.newCustomerName} onChangeText={(newCustomerName) => setDraft((current) => ({ ...current, newCustomerName }))} placeholder="Customer name" />
-          <FieldRow label="Phone number" value={draft.newCustomerPhone} onChangeText={(newCustomerPhone) => setDraft((current) => ({ ...current, newCustomerPhone }))} placeholder="080..." keyboardType="phone-pad" />
-        </>
-      ) : null}
+      <CustomerDropdown
+        customers={data.customers}
+        selectedCustomerId={draft.customerId}
+        onSelect={(customerId) => setDraft((current) => ({ ...current, customerId }))}
+        emptyText="Add a customer first, then record what they owe."
+      />
       <FieldRow label="Description" value={draft.description} onChangeText={(description) => setDraft((current) => ({ ...current, description }))} placeholder="Rice, POS withdrawal, Hair appointment" />
       <FieldRow label="Amount" value={draft.amount} onChangeText={(amountValue) => setDraft((current) => ({ ...current, amount: amountValue }))} placeholder="20000" keyboardType="numeric" />
       <Text style={styles.fieldLabel}>Due date</Text>
@@ -994,18 +990,12 @@ function PaymentModal({
 
   return (
     <Sheet open={open} title="Record Payment" onClose={onClose}>
-      <Text style={styles.fieldLabel}>Customer</Text>
-      <View style={styles.customerPicker}>
-        {data.customers.map((customer) => (
-          <Pressable
-            key={customer.id}
-            onPress={() => setDraft((current) => ({ ...current, customerId: customer.id, debtId: '' }))}
-            style={[styles.customerChip, draft.customerId === customer.id && styles.customerChipActive]}
-          >
-            <Text style={[styles.customerChipText, draft.customerId === customer.id && styles.customerChipTextActive]}>{customer.name}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <CustomerDropdown
+        customers={data.customers}
+        selectedCustomerId={draft.customerId}
+        onSelect={(customerId) => setDraft((current) => ({ ...current, customerId, debtId: '' }))}
+        emptyText="Add a customer before recording a payment."
+      />
       <Text style={styles.fieldLabel}>Apply to</Text>
       <ChipRow values={['Oldest debt', ...debtOptions.map((option) => option.label)]} active={activeDebtLabel} onChange={(value) => {
         const debt = debtOptions.find((item) => item.label === value);
@@ -1379,6 +1369,70 @@ function SearchBox({ value, onChangeText, placeholder }: { value: string; onChan
   );
 }
 
+function CustomerDropdown({
+  customers,
+  selectedCustomerId,
+  onSelect,
+  emptyText
+}: {
+  customers: Customer[];
+  selectedCustomerId: string;
+  onSelect: (customerId: string) => void;
+  emptyText: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+  const filteredCustomers = customers.filter((customer) =>
+    [customer.name, customer.phone].join(' ').toLowerCase().includes(query.trim().toLowerCase())
+  );
+
+  useEffect(() => {
+    setOpen(false);
+    setQuery('');
+  }, [selectedCustomerId]);
+
+  if (!customers.length) {
+    return <EmptyInline title="No customer yet" body={emptyText} />;
+  }
+
+  return (
+    <View style={styles.dropdownWrap}>
+      <Text style={styles.fieldLabel}>Customer</Text>
+      <Pressable onPress={() => setOpen((current) => !current)} style={styles.dropdownButton}>
+        <View style={styles.rowCopy}>
+          <Text style={[styles.dropdownTitle, !selectedCustomer && styles.dropdownPlaceholder]}>
+            {selectedCustomer?.name ?? 'Choose customer'}
+          </Text>
+          <Text style={styles.dropdownMeta}>{selectedCustomer?.phone || 'Search by name or phone'}</Text>
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.green} />
+      </Pressable>
+
+      {open ? (
+        <Card style={styles.dropdownPanel}>
+          <SearchBox value={query} onChangeText={setQuery} placeholder="Search customers" />
+          <View style={styles.dropdownList}>
+            {filteredCustomers.length ? filteredCustomers.slice(0, 8).map((customer) => (
+              <Pressable
+                key={customer.id}
+                onPress={() => onSelect(customer.id)}
+                style={[styles.dropdownOption, customer.id === selectedCustomerId && styles.dropdownOptionActive]}
+              >
+                <View style={styles.rowCopy}>
+                  <Text style={styles.dropdownOptionTitle}>{customer.name}</Text>
+                  <Text style={styles.dropdownOptionMeta}>{customer.phone || 'No phone saved'}</Text>
+                </View>
+                {customer.id === selectedCustomerId ? <Ionicons name="checkmark" size={18} color={colors.green} /> : null}
+              </Pressable>
+            )) : <EmptyInline title="No match" body="Try another name or phone number." />}
+          </View>
+        </Card>
+      ) : null}
+    </View>
+  );
+}
+
 function ChipRow({ values, active, onChange }: { values: string[] | readonly string[]; active: string; onChange: (value: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -1678,9 +1732,16 @@ const styles = StyleSheet.create({
     ...shadows.card
   },
   recentRow: {
+    minHeight: 74,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12
+    gap: 12,
+    ...shadows.card
   },
   rowCopy: {
     flex: 1,
@@ -1809,6 +1870,62 @@ const styles = StyleSheet.create({
     color: colors.charcoal,
     fontSize: 15,
     fontFamily: fonts.semibold
+  },
+  dropdownWrap: {
+    gap: 8
+  },
+  dropdownButton: {
+    minHeight: 62,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.paper,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  dropdownTitle: {
+    color: colors.charcoal,
+    fontSize: 16,
+    fontFamily: fonts.extraBold
+  },
+  dropdownPlaceholder: {
+    color: colors.mutedText
+  },
+  dropdownMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: fonts.medium
+  },
+  dropdownPanel: {
+    gap: 10,
+    padding: 10
+  },
+  dropdownList: {
+    gap: 6
+  },
+  dropdownOption: {
+    minHeight: 58,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  dropdownOptionActive: {
+    backgroundColor: colors.greenMist
+  },
+  dropdownOptionTitle: {
+    color: colors.charcoal,
+    fontSize: 14,
+    fontFamily: fonts.extraBold
+  },
+  dropdownOptionMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: fonts.medium
   },
   chipRow: {
     gap: 8,
@@ -2049,33 +2166,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.semibold,
     color: colors.charcoal
-  },
-  customerPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
-  },
-  customerChip: {
-    minHeight: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  customerChipActive: {
-    backgroundColor: colors.green,
-    borderColor: colors.green
-  },
-  customerChipText: {
-    color: colors.charcoal,
-    fontSize: 13,
-    fontFamily: fonts.bold
-  },
-  customerChipTextActive: {
-    color: colors.white
   },
   sheet: {
     flex: 1,

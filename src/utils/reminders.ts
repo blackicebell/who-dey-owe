@@ -3,10 +3,21 @@ import { AppSettings, CustomerSummary } from '../types';
 import { formatNaira } from './money';
 
 export function buildReminderMessage(customer: CustomerSummary, settings: AppSettings) {
-  return settings.reminderTemplate
+  const businessName = settings.businessName?.trim() || 'my shop';
+  const ownerName = settings.ownerName?.trim();
+  const message = settings.reminderTemplate
     .replace(/\{customerName\}/g, customer.name)
     .replace(/\{balance\}/g, formatNaira(customer.balance))
-    .replace(/\{businessName\}/g, settings.businessName || 'my shop');
+    .replace(/\{businessName\}/g, businessName)
+    .replace(/\{ownerName\}/g, ownerName || businessName);
+
+  const signature = ownerName
+    ? `${ownerName}${businessName ? `, ${businessName}` : ''}`
+    : businessName;
+
+  return signature && !message.toLowerCase().includes(signature.toLowerCase())
+    ? `${message}\n\n${signature}`
+    : message;
 }
 
 function normalizeNigeriaPhone(phone: string) {
