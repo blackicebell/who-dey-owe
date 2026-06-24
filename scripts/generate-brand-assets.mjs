@@ -32,6 +32,11 @@ const jobs = [
     height: 520
   },
   {
+    input: 'assets/brand/who-dey-owe-mark.svg',
+    output: `${iconDir}/logo-512.png`,
+    size: 512
+  },
+  {
     input: 'assets/brand/who-dey-owe-flat.svg',
     output: `${iconDir}/app-icon-flat-1024.png`,
     size: 1024
