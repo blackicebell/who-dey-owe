@@ -98,6 +98,46 @@ const tabs: { key: Tab; icon: keyof typeof Ionicons.glyphMap; label: string }[] 
   { key: 'Settings', icon: 'settings', label: 'Settings' }
 ];
 
+function hashPin(pin: string) {
+  let hash = 5381;
+  for (let index = 0; index < pin.length; index += 1) {
+    hash = ((hash << 5) + hash) ^ pin.charCodeAt(index);
+  }
+  return String(hash >>> 0);
+}
+
+function getBackupPayload(data: AppData) {
+  return JSON.stringify({
+    app: 'Who Dey Owe?',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data
+  }, null, 2);
+}
+
+function parseBackupPayload(raw: string): AppData {
+  const parsed = JSON.parse(raw) as AppData | { data?: AppData };
+  const data = 'data' in parsed && parsed.data ? parsed.data : parsed as AppData;
+  if (!Array.isArray(data.customers) || !Array.isArray(data.debts) || !Array.isArray(data.payments)) {
+    throw new Error('Invalid backup');
+  }
+
+  const customerIds = new Set(data.customers.map((customer) => customer.id));
+  const debtIds = new Set(data.debts.map((debt) => debt.id));
+  const hasBadDebt = data.debts.some((debt) => !customerIds.has(debt.customerId));
+  const hasBadPayment = data.payments.some((payment) => !customerIds.has(payment.customerId) || (payment.debtId && !debtIds.has(payment.debtId)));
+  if (hasBadDebt || hasBadPayment) {
+    throw new Error('Backup has broken customer or debt links');
+  }
+
+  return {
+    settings: { ...defaultSettings, ...data.settings, onboardingComplete: true },
+    customers: data.customers,
+    debts: data.debts,
+    payments: data.payments
+  };
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
@@ -108,10 +148,13 @@ export default function App() {
   });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AppData>({ settings: defaultSettings, customers: [], debts: [], payments: [] });
+  const [appLocked, setAppLocked] = useState(false);
 
   useEffect(() => {
     migrateDatabase();
-    setData(loadData());
+    const storedData = loadData();
+    setData(storedData);
+    setAppLocked(storedData.settings.appLockEnabled);
     setLoading(false);
   }, []);
 
@@ -132,7 +175,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      {data.settings.onboardingComplete ? (
+      {appLocked ? (
+        <LockScreen settings={data.settings} onUnlock={() => setAppLocked(false)} />
+      ) : data.settings.onboardingComplete ? (
         <MainApp data={data} setData={setData} />
       ) : (
         <Onboarding
@@ -215,6 +260,46 @@ function Onboarding({ onComplete }: { onComplete: (settings: AppData['settings']
           {step > 0 ? <Button label="Back" variant="ghost" onPress={() => setStep((current) => current - 1)} /> : null}
         </View>
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function LockScreen({ settings, onUnlock }: { settings: AppData['settings']; onUnlock: () => void }) {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+
+  function unlock() {
+    if (hashPin(pin) === settings.appLockPinHash) {
+      setError('');
+      setPin('');
+      onUnlock();
+      return;
+    }
+    setError('Wrong PIN. Try again.');
+  }
+
+  return (
+    <SafeAreaView style={styles.lockScreen}>
+      <View style={styles.brandMark}>
+        <Text style={styles.brandInitial}>W</Text>
+      </View>
+      <Text style={styles.lockTitle}>Who Dey Owe?</Text>
+      <Text style={styles.lockBody}>Enter your PIN to open your debt records.</Text>
+      <TextInput
+        value={pin}
+        onChangeText={(value) => {
+          setError('');
+          setPin(value.replace(/\D/g, '').slice(0, 6));
+        }}
+        placeholder="PIN"
+        placeholderTextColor={colors.mutedText}
+        secureTextEntry
+        keyboardType="number-pad"
+        style={styles.lockInput}
+        onSubmitEditing={unlock}
+      />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <Button label="Unlock" icon="lock-open" onPress={unlock} disabled={pin.length < 4} />
     </SafeAreaView>
   );
 }
@@ -753,7 +838,8 @@ function SettingsScreen({
   const [businessName, setBusinessName] = useState(data.settings.businessName);
   const [ownerName, setOwnerName] = useState(data.settings.ownerName);
   const [template, setTemplate] = useState(data.settings.reminderTemplate);
-  const backupText = JSON.stringify(data, null, 2);
+  const [pinDraft, setPinDraft] = useState('');
+  const backupText = getBackupPayload(data);
 
   function saveSettings() {
     setData((current) => ({
@@ -786,15 +872,63 @@ function SettingsScreen({
   async function importFromClipboard() {
     try {
       const raw = await Clipboard.getStringAsync();
-      const parsed = JSON.parse(raw) as AppData;
-      if (!Array.isArray(parsed.customers) || !Array.isArray(parsed.debts) || !Array.isArray(parsed.payments)) {
-        throw new Error('Invalid backup');
-      }
-      setData({ ...parsed, settings: { ...defaultSettings, ...parsed.settings, onboardingComplete: true } });
-      showToast('Backup imported.');
-    } catch {
-      Alert.alert('Import failed', 'Copy a valid Who Dey Owe backup JSON first, then try again.');
+      const nextData = parseBackupPayload(raw);
+      Alert.alert(
+        'Import this backup?',
+        `Customers: ${nextData.customers.length}\nDebts: ${nextData.debts.length}\nPayments: ${nextData.payments.length}\n\nThis will replace the records on this device.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Import',
+            onPress: () => {
+              setData(nextData);
+              showToast('Backup imported.');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Import failed', error instanceof Error ? error.message : 'Copy a valid Who Dey Owe backup JSON first, then try again.');
     }
+  }
+
+  function savePinLock() {
+    if (pinDraft.length < 4) {
+      Alert.alert('PIN too short', 'Use at least 4 digits.');
+      return;
+    }
+    setData((current) => ({
+      ...current,
+      settings: {
+        ...current.settings,
+        appLockEnabled: true,
+        appLockPinHash: hashPin(pinDraft)
+      }
+    }));
+    setPinDraft('');
+    showToast('PIN lock enabled.');
+  }
+
+  function disablePinLock() {
+    Alert.alert('Turn off PIN lock?', 'The app will open without asking for a PIN on this device.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Turn Off',
+        style: 'destructive',
+        onPress: () => {
+          setData((current) => ({
+            ...current,
+            settings: {
+              ...current.settings,
+              appLockEnabled: false,
+              appLockPinHash: ''
+            }
+          }));
+          setPinDraft('');
+          showToast('PIN lock turned off.');
+        }
+      }
+    ]);
   }
 
   function clearAll() {
@@ -842,6 +976,22 @@ function SettingsScreen({
           showToast('Test scenario added.');
         }} />
         <Button label="Clear All Data" icon="trash" variant="danger" onPress={clearAll} />
+      </Card>
+      <Card style={styles.formCard}>
+        <Text style={styles.cardTitle}>Privacy</Text>
+        <Text style={styles.formHint}>
+          {data.settings.appLockEnabled ? 'PIN lock is on for this device.' : 'Add a PIN so casual users cannot open your debt list.'}
+        </Text>
+        <FieldRow
+          label={data.settings.appLockEnabled ? 'New PIN' : 'PIN'}
+          value={pinDraft}
+          onChangeText={(value) => setPinDraft(value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="4-6 digits"
+          secureTextEntry
+          keyboardType="number-pad"
+        />
+        <Button label={data.settings.appLockEnabled ? 'Change PIN' : 'Turn On PIN Lock'} icon="lock-closed" onPress={savePinLock} />
+        {data.settings.appLockEnabled ? <Button label="Turn Off PIN Lock" icon="lock-open" variant="danger" onPress={disablePinLock} /> : null}
       </Card>
       <Card style={styles.formCard}>
         <Text style={styles.cardTitle}>About</Text>
@@ -1514,6 +1664,47 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  lockScreen: {
+    flex: 1,
+    backgroundColor: colors.cream,
+    padding: spacing.lg,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    gap: 14
+  },
+  lockTitle: {
+    color: colors.charcoal,
+    fontSize: 34,
+    lineHeight: 41,
+    textAlign: 'center',
+    fontFamily: fonts.extraBold
+  },
+  lockBody: {
+    color: colors.muted,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    fontFamily: fonts.medium
+  },
+  lockInput: {
+    minHeight: 58,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    color: colors.charcoal,
+    fontSize: 20,
+    letterSpacing: 4,
+    textAlign: 'center',
+    fontFamily: fonts.extraBold
+  },
+  errorText: {
+    color: colors.danger,
+    textAlign: 'center',
+    fontSize: 13,
+    fontFamily: fonts.extraBold
   },
   screen: {
     flex: 1,

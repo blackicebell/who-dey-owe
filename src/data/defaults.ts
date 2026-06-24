@@ -9,7 +9,9 @@ export const defaultSettings: AppSettings = {
   ownerName: '',
   reminderTemplate: defaultReminderTemplate,
   currencySymbol: '₦',
-  themePreference: 'system'
+  themePreference: 'system',
+  appLockEnabled: false,
+  appLockPinHash: ''
 };
 
 export const emptyData: AppData = {

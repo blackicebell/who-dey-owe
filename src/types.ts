@@ -43,6 +43,8 @@ export type AppSettings = {
   reminderTemplate: string;
   currencySymbol: string;
   themePreference: ThemePreference;
+  appLockEnabled: boolean;
+  appLockPinHash: string;
 };
 
 export type AppData = {

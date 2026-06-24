@@ -115,15 +115,25 @@ export function recordPayment(data: AppData, draft: {
     .map((debt) => debt.id);
 
   const targetIds = draft.debtId ? [draft.debtId] : sortedDebtIds;
-  const debts = data.debts.map((debt) => {
-    if (!targetIds.includes(debt.id) || remaining <= 0) return normalizeDebt(debt);
+  const debtUpdates = new Map<string, Debt>();
+
+  targetIds.forEach((debtId) => {
+    if (remaining <= 0) return;
+    const sourceDebt = debtUpdates.get(debtId) ?? data.debts.find((item) => item.id === debtId);
+    if (!sourceDebt) return;
+    const debt = normalizeDebt(sourceDebt);
+    if (debt.balance <= 0) return;
     const paidNow = Math.min(debt.balance, remaining);
     remaining -= paidNow;
-    return normalizeDebt({
+    debtUpdates.set(debt.id, normalizeDebt({
       ...debt,
       amountPaid: debt.amountPaid + paidNow,
       updatedAt: now
-    });
+    }));
+  });
+
+  const debts = data.debts.map((debt) => {
+    return debtUpdates.get(debt.id) ?? normalizeDebt(debt);
   });
 
   return {
