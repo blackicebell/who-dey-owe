@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -44,7 +45,7 @@ import { colors, fonts, radius, shadows, spacing } from './src/theme';
 import { AppData, Customer, CustomerSummary, Debt, Tab } from './src/types';
 import { addDays, daysBetween, formatShortDate, isDueThisWeek, isDueToday, todayKey } from './src/utils/date';
 import { formatNaira, parseMoney } from './src/utils/money';
-import { buildReminderMessage, openWhatsAppReminder } from './src/utils/reminders';
+import { openWhatsAppMessage, openWhatsAppReminder } from './src/utils/reminders';
 
 type CustomerDraft = {
   name: string;
@@ -68,6 +69,11 @@ type PaymentDraft = {
   amount: string;
   paymentDate: string;
   note: string;
+};
+
+type ReceiptPreview = {
+  customer: CustomerSummary;
+  message: string;
 };
 
 const emptyCustomerDraft: CustomerDraft = { name: '', phone: '', notes: '' };
@@ -148,17 +154,17 @@ function Onboarding({ onComplete }: { onComplete: (settings: AppData['settings']
   const slides = [
     {
       title: 'Who Dey Owe?',
-      body: 'Track customer debts without stress. Know who owes you, how much, and who needs a reminder.',
+      body: 'Keep every customer balance in one clear place, even when the shop is busy.',
       icon: 'receipt'
     },
     {
-      title: 'Record debts fast',
-      body: 'Add customer name, phone number, amount, due date, and small notes in a few taps.',
+      title: 'Add what they owe',
+      body: 'Save the customer, amount, item, and due date together so nothing gets lost later.',
       icon: 'flash'
     },
     {
-      title: 'Send reminders',
-      body: 'Open WhatsApp with a ready-made message. You stay in control before anything is sent.',
+      title: 'Follow up with care',
+      body: 'Prepare WhatsApp reminders and payment receipts with the details already filled in.',
       icon: 'logo-whatsapp'
     }
   ] as const;
@@ -195,8 +201,8 @@ function Onboarding({ onComplete }: { onComplete: (settings: AppData['settings']
           </Card>
         ) : (
           <Card style={styles.promiseCard}>
-            <Text style={styles.promiseTitle}>Built for rush hour</Text>
-            <Text style={styles.promiseText}>No login. No internet required. No accounting grammar.</Text>
+            <Text style={styles.promiseTitle}>Made for everyday credit sales</Text>
+            <Text style={styles.promiseText}>Works offline, opens fast, and keeps the focus on who still needs to pay.</Text>
           </Card>
         )}
 
@@ -223,6 +229,7 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<ReceiptPreview | null>(null);
   const [toast, setToast] = useState('');
 
   const summaries = useMemo(() => getCustomerSummaries(data), [data]);
@@ -313,12 +320,17 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
         open={customerModalOpen}
         customer={selectedCustomer}
         onClose={() => setCustomerModalOpen(false)}
-        onSave={(draft, editingCustomer) => {
+        onSave={(draft, editingCustomer, addDebtNext) => {
           const next = editingCustomer
             ? upsertCustomer(data, { ...editingCustomer, ...draft })
             : addCustomer(data, draft);
           updateData(next, editingCustomer ? 'Customer updated.' : 'Customer saved.');
           setCustomerModalOpen(false);
+          if (addDebtNext) {
+            const customerId = editingCustomer?.id ?? next.customers[0]?.id;
+            setSelectedCustomerId(customerId ?? null);
+            setDebtModalOpen(true);
+          }
         }}
       />
       <DebtModal
@@ -336,9 +348,19 @@ function MainApp({ data, setData }: { data: AppData; setData: React.Dispatch<Rea
         data={data}
         selectedCustomerId={selectedCustomerId}
         onClose={() => setPaymentModalOpen(false)}
-        onSave={(next) => {
+        onSave={(next, preview) => {
           updateData(next, 'Payment recorded.');
           setPaymentModalOpen(false);
+          if (preview) setReceiptPreview(preview);
+        }}
+      />
+      <ReceiptPreviewModal
+        preview={receiptPreview}
+        onClose={() => setReceiptPreview(null)}
+        onSend={async () => {
+          if (!receiptPreview) return;
+          await openWhatsAppMessage(receiptPreview.customer.phone, receiptPreview.message);
+          setReceiptPreview(null);
         }}
       />
       {toast ? (
@@ -535,7 +557,7 @@ function CustomerDetail({
       <View style={styles.actionGrid}>
         <Button label="Add Debt" icon="add" onPress={onAddDebt} style={styles.gridButton} />
         <Button label="Record Payment" icon="cash" variant="secondary" onPress={onPayment} style={styles.gridButton} />
-        <Button label="WhatsApp" icon="logo-whatsapp" variant="ghost" onPress={() => openWhatsAppReminder(customer, data.settings)} style={styles.gridButton} />
+        <Button label="Send WhatsApp Reminder" icon="logo-whatsapp" variant="ghost" onPress={() => openWhatsAppReminder(customer, data.settings)} style={styles.gridButton} />
       </View>
 
       <SectionTitle title="Debts" />
@@ -751,12 +773,14 @@ function CustomerModal({
   open: boolean;
   customer: CustomerSummary | null;
   onClose: () => void;
-  onSave: (draft: CustomerDraft, customer: Customer | null) => void;
+  onSave: (draft: CustomerDraft, customer: Customer | null, addDebtNext: boolean) => void;
 }) {
   const [draft, setDraft] = useState<CustomerDraft>(emptyCustomerDraft);
+  const [addDebtNext, setAddDebtNext] = useState(true);
 
   useEffect(() => {
     setDraft(customer ? { name: customer.name, phone: customer.phone, notes: customer.notes } : emptyCustomerDraft);
+    setAddDebtNext(!customer);
   }, [customer, open]);
 
   return (
@@ -764,7 +788,21 @@ function CustomerModal({
       <FieldRow label="Customer name" value={draft.name} onChangeText={(name) => setDraft((current) => ({ ...current, name }))} placeholder="Chinedu" />
       <FieldRow label="Phone number" value={draft.phone} onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))} placeholder="080..." keyboardType="phone-pad" />
       <FieldRow label="Notes" value={draft.notes} onChangeText={(notes) => setDraft((current) => ({ ...current, notes }))} placeholder="Optional" multiline />
-      <Button label="Save Customer" icon="checkmark" disabled={!draft.name.trim()} onPress={() => onSave(draft, customer)} />
+      <Pressable onPress={() => setAddDebtNext((current) => !current)} style={styles.optionRow}>
+        <View style={[styles.checkbox, addDebtNext && styles.checkboxActive]}>
+          {addDebtNext ? <Ionicons name="checkmark" size={16} color={colors.white} /> : null}
+        </View>
+        <View style={styles.rowCopy}>
+          <Text style={styles.optionTitle}>Add what this customer owes next</Text>
+          <Text style={styles.optionMeta}>Most new customers are added because there is a debt to record.</Text>
+        </View>
+      </Pressable>
+      <Button
+        label={addDebtNext ? 'Save and Add Debt' : 'Save Customer'}
+        icon={addDebtNext ? 'add-circle' : 'checkmark'}
+        disabled={!draft.name.trim()}
+        onPress={() => onSave(draft, customer, addDebtNext)}
+      />
     </Sheet>
   );
 }
@@ -783,9 +821,11 @@ function DebtModal({
   onSave: (data: AppData) => void;
 }) {
   const [draft, setDraft] = useState<DebtDraft>({ ...emptyDebtDraft, customerId: selectedCustomerId ?? '' });
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
 
   useEffect(() => {
     setDraft({ ...emptyDebtDraft, customerId: selectedCustomerId ?? '' });
+    setShowDueDatePicker(false);
   }, [open, selectedCustomerId]);
 
   function saveDebt() {
@@ -831,15 +871,39 @@ function DebtModal({
       <FieldRow label="Description" value={draft.description} onChangeText={(description) => setDraft((current) => ({ ...current, description }))} placeholder="Rice, POS withdrawal, Hair appointment" />
       <FieldRow label="Amount" value={draft.amount} onChangeText={(amountValue) => setDraft((current) => ({ ...current, amount: amountValue }))} placeholder="20000" keyboardType="numeric" />
       <Text style={styles.fieldLabel}>Due date</Text>
-      <ChipRow values={['None', 'Today', 'Tomorrow', '7 days']} active={quickDateLabel(draft.dueDate)} onChange={(value) => setDraft((current) => ({ ...current, dueDate: dateFromQuickLabel(value) }))} />
-      <TextInput
-        value={draft.dueDate}
-        onChangeText={(dueDate) => setDraft((current) => ({ ...current, dueDate }))}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.mutedText}
-        style={styles.input}
+      <ChipRow
+        values={['None', 'Today', 'Tomorrow', '7 days', 'Custom']}
+        active={quickDateLabel(draft.dueDate)}
+        onChange={(value) => {
+          if (value === 'Custom') {
+            setShowDueDatePicker(true);
+            setDraft((current) => ({ ...current, dueDate: current.dueDate || todayKey() }));
+            return;
+          }
+          setShowDueDatePicker(false);
+          setDraft((current) => ({ ...current, dueDate: dateFromQuickLabel(value) }));
+        }}
       />
-      <FieldRow label="Note" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Optional" multiline />
+      {draft.dueDate ? (
+        <Pressable onPress={() => setShowDueDatePicker(true)} style={styles.dateSummary}>
+          <Ionicons name="calendar" size={18} color={colors.green} />
+          <Text style={styles.dateSummaryText}>Due {formatShortDate(draft.dueDate)}</Text>
+          <Text style={styles.dateSummaryAction}>Change</Text>
+        </Pressable>
+      ) : null}
+      {showDueDatePicker ? (
+        <DateTimePicker
+          value={draft.dueDate ? new Date(`${draft.dueDate}T12:00:00`) : new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={(_, selectedDate) => {
+            if (Platform.OS !== 'ios') setShowDueDatePicker(false);
+            if (!selectedDate) return;
+            setDraft((current) => ({ ...current, dueDate: todayKey(selectedDate) }));
+          }}
+        />
+      ) : null}
+      <FieldRow label="Private note" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Only you will see this" multiline />
       <Button label="Save Debt" icon="checkmark" disabled={!canSave} onPress={saveDebt} />
     </Sheet>
   );
@@ -856,10 +920,18 @@ function PaymentModal({
   data: AppData;
   selectedCustomerId: string | null;
   onClose: () => void;
-  onSave: (data: AppData) => void;
+  onSave: (data: AppData, receiptPreview?: ReceiptPreview) => void;
 }) {
   const [draft, setDraft] = useState<PaymentDraft>({ ...emptyPaymentDraft, customerId: selectedCustomerId ?? '' });
   const customerDebts = data.debts.filter((debt) => debt.customerId === draft.customerId && debt.balance > 0).map(normalizeDebt);
+  const selectedDebt = draft.debtId ? customerDebts.find((debt) => debt.id === draft.debtId) ?? null : customerDebts[0] ?? null;
+  const debtOptions = customerDebts.map((debt) => ({
+    id: debt.id,
+    label: `${debt.description} · ${formatNaira(debt.balance)}`
+  }));
+  const activeDebtLabel = draft.debtId
+    ? debtOptions.find((option) => option.id === draft.debtId)?.label ?? 'Oldest debt'
+    : 'Oldest debt';
   const amount = parseMoney(draft.amount);
 
   useEffect(() => {
@@ -881,24 +953,57 @@ function PaymentModal({
         ))}
       </View>
       <Text style={styles.fieldLabel}>Apply to</Text>
-      <ChipRow values={['Oldest debt', ...customerDebts.map((debt) => debt.description)]} active={draft.debtId ? customerDebts.find((debt) => debt.id === draft.debtId)?.description ?? 'Oldest debt' : 'Oldest debt'} onChange={(value) => {
-        const debt = customerDebts.find((item) => item.description === value);
+      <ChipRow values={['Oldest debt', ...debtOptions.map((option) => option.label)]} active={activeDebtLabel} onChange={(value) => {
+        const debt = debtOptions.find((item) => item.label === value);
         setDraft((current) => ({ ...current, debtId: debt?.id ?? '' }));
       }} />
+      {selectedDebt ? (
+        <Card style={styles.debtContextCard}>
+          <View style={styles.headerRowTight}>
+            <View style={styles.rowCopy}>
+              <Text style={styles.contextTitle}>{draft.debtId ? selectedDebt.description : 'Oldest active debt'}</Text>
+              <Text style={styles.rowMeta}>{selectedDebt.description} was recorded {formatShortDate(selectedDebt.createdAt.slice(0, 10))}</Text>
+            </View>
+            <Text style={styles.contextAmount}>{formatNaira(selectedDebt.balance)}</Text>
+          </View>
+        </Card>
+      ) : null}
       <FieldRow label="Payment amount" value={draft.amount} onChangeText={(amountValue) => setDraft((current) => ({ ...current, amount: amountValue }))} placeholder="7000" keyboardType="numeric" />
       <FieldRow label="Payment date" value={draft.paymentDate} onChangeText={(paymentDate) => setDraft((current) => ({ ...current, paymentDate }))} placeholder="YYYY-MM-DD" />
-      <FieldRow label="Note" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Optional" multiline />
+      <FieldRow label="Private note" value={draft.note} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Only you will see this. It will not be sent." multiline />
+      <Card style={styles.receiptHintCard}>
+        <Ionicons name="logo-whatsapp" size={20} color={colors.green} />
+        <View style={styles.rowCopy}>
+          <Text style={styles.optionTitle}>Preview WhatsApp receipt after saving</Text>
+          <Text style={styles.optionMeta}>Your private note will not be included in the receipt.</Text>
+        </View>
+      </Card>
       <Button
         label="Save Payment"
         icon="checkmark"
         disabled={!draft.customerId || amount <= 0}
-        onPress={() => onSave(recordPayment(data, {
-          customerId: draft.customerId,
-          debtId: draft.debtId || null,
-          amount,
-          paymentDate: draft.paymentDate || todayKey(),
-          note: draft.note
-        }))}
+        onPress={() => {
+          const next = recordPayment(data, {
+            customerId: draft.customerId,
+            debtId: draft.debtId || null,
+            amount,
+            paymentDate: draft.paymentDate || todayKey(),
+            note: draft.note
+          });
+          const customer = getCustomerSummaries(next).find((item) => item.id === draft.customerId);
+          const receiptDebt = draft.debtId ? data.debts.find((debt) => debt.id === draft.debtId) : selectedDebt;
+          onSave(next, customer ? {
+            customer,
+            message: buildPaymentReceiptMessage({
+              customerName: customer.name,
+              businessName: data.settings.businessName,
+              amount,
+              paymentDate: draft.paymentDate || todayKey(),
+              debtDescription: receiptDebt?.description,
+              remainingBalance: customer.balance
+            })
+          } : undefined);
+        }}
       />
     </Sheet>
   );
@@ -920,6 +1025,65 @@ function Sheet({ open, title, onClose, children }: React.PropsWithChildren<{ ope
       </SafeAreaView>
     </Modal>
   );
+}
+
+function ReceiptPreviewModal({
+  preview,
+  onClose,
+  onSend
+}: {
+  preview: ReceiptPreview | null;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <Modal visible={Boolean(preview)} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.previewOverlay}>
+        <Card style={styles.previewCard}>
+          <View style={styles.headerRowTight}>
+            <View style={styles.rowCopy}>
+              <Text style={styles.cardTitle}>Send payment receipt?</Text>
+              <Text style={styles.rowMeta}>Preview the WhatsApp message before it opens.</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.iconButton}>
+              <Ionicons name="close" size={20} color={colors.green} />
+            </Pressable>
+          </View>
+          <View style={styles.messagePreview}>
+            <Text style={styles.messagePreviewText}>{preview?.message}</Text>
+          </View>
+          <Text style={styles.formHint}>Private notes are not included. The app will open WhatsApp with this receipt ready for you to send.</Text>
+          <Button label="Open WhatsApp Receipt" icon="logo-whatsapp" onPress={onSend} />
+          <Button label="Not Now" variant="ghost" onPress={onClose} />
+        </Card>
+      </View>
+    </Modal>
+  );
+}
+
+function buildPaymentReceiptMessage({
+  customerName,
+  businessName,
+  amount,
+  paymentDate,
+  debtDescription,
+  remainingBalance
+}: {
+  customerName: string;
+  businessName: string;
+  amount: number;
+  paymentDate: string;
+  debtDescription?: string;
+  remainingBalance: number;
+}) {
+  const shop = businessName?.trim() || 'Who Dey Owe?';
+  const forLine = debtDescription ? ` for ${debtDescription}` : '';
+  return [
+    `Hello ${customerName}, payment received${forLine}: ${formatNaira(amount)}.`,
+    `Date: ${formatShortDate(paymentDate)}.`,
+    `Remaining balance: ${formatNaira(remainingBalance)}.`,
+    `Thank you. ${shop}`
+  ].join('\n');
 }
 
 function BottomTabs({ activeTab, setActiveTab }: { activeTab: Tab; setActiveTab: (tab: Tab) => void }) {
@@ -981,6 +1145,7 @@ function DebtRow({
         <Text style={styles.balanceText}>{formatNaira(debt.balance)}</Text>
         <Pressable onPress={onReminder} style={styles.whatsappButton}>
           <Ionicons name="logo-whatsapp" size={18} color={colors.white} />
+          <Text style={styles.whatsappButtonText}>Remind</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -1096,7 +1261,7 @@ function quickDateLabel(date: string) {
   if (date === todayKey()) return 'Today';
   if (date === addDays(1)) return 'Tomorrow';
   if (date === addDays(7)) return '7 days';
-  return date;
+  return 'Custom';
 }
 
 function dateFromQuickLabel(label: string) {
@@ -1387,12 +1552,20 @@ const styles = StyleSheet.create({
     color: colors.green
   },
   whatsappButton: {
-    width: 38,
+    minWidth: 86,
     height: 38,
     borderRadius: 15,
     backgroundColor: colors.greenSoft,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 10
+  },
+  whatsappButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontFamily: fonts.extraBold
   },
   smallIcon: {
     width: 42,
@@ -1591,6 +1764,81 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontFamily: fonts.medium
   },
+  optionRow: {
+    minHeight: 78,
+    borderRadius: radius.lg,
+    backgroundColor: colors.greenMist,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  checkbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white
+  },
+  checkboxActive: {
+    backgroundColor: colors.green
+  },
+  optionTitle: {
+    color: colors.charcoal,
+    fontSize: 14,
+    fontFamily: fonts.extraBold
+  },
+  optionMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.medium
+  },
+  dateSummary: {
+    minHeight: 54,
+    borderRadius: radius.md,
+    backgroundColor: colors.greenMist,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  dateSummaryText: {
+    flex: 1,
+    color: colors.charcoal,
+    fontSize: 15,
+    fontFamily: fonts.extraBold
+  },
+  dateSummaryAction: {
+    color: colors.green,
+    fontSize: 13,
+    fontFamily: fonts.extraBold
+  },
+  debtContextCard: {
+    backgroundColor: colors.ledgerCream,
+    gap: 6
+  },
+  contextTitle: {
+    color: colors.charcoal,
+    fontSize: 15,
+    fontFamily: fonts.extraBold
+  },
+  contextAmount: {
+    color: colors.green,
+    fontSize: 18,
+    fontFamily: fonts.extraBold
+  },
+  receiptHintCard: {
+    backgroundColor: colors.greenMist,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12
+  },
   fieldLabel: {
     color: colors.charcoal,
     fontSize: 14,
@@ -1654,6 +1902,28 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: 8,
     gap: 14
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17,24,39,0.34)',
+    padding: spacing.lg,
+    justifyContent: 'center'
+  },
+  previewCard: {
+    gap: 14
+  },
+  messagePreview: {
+    borderRadius: radius.md,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 14
+  },
+  messagePreviewText: {
+    color: colors.charcoal,
+    fontSize: 15,
+    lineHeight: 23,
+    fontFamily: fonts.semibold
   },
   bottomNav: {
     position: 'absolute',

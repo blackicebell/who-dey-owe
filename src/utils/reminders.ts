@@ -16,10 +16,9 @@ function normalizeNigeriaPhone(phone: string) {
   return digits;
 }
 
-export async function openWhatsAppReminder(customer: CustomerSummary, settings: AppSettings) {
-  const message = buildReminderMessage(customer, settings);
+export async function openWhatsAppMessage(phoneNumber: string, message: string) {
   const encoded = encodeURIComponent(message);
-  const phone = normalizeNigeriaPhone(customer.phone);
+  const phone = normalizeNigeriaPhone(phoneNumber);
   const url = phone ? `whatsapp://send?phone=${phone}&text=${encoded}` : `whatsapp://send?text=${encoded}`;
 
   if (Platform.OS === 'web') {
@@ -36,6 +35,10 @@ export async function openWhatsAppReminder(customer: CustomerSummary, settings: 
   try {
     await Share.share({ message });
   } catch {
-    Alert.alert('Reminder ready', message);
+    Alert.alert('Message ready', message);
   }
+}
+
+export async function openWhatsAppReminder(customer: CustomerSummary, settings: AppSettings) {
+  await openWhatsAppMessage(customer.phone, buildReminderMessage(customer, settings));
 }
