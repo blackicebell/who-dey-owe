@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/logic/debts.test.ts"
+    "test": "tsx --test src/logic/debts.test.ts",
+    "brand:assets": "node scripts/generate-brand-assets.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.0.10",
+    "sharp": "^0.34.5",
     "tsx": "^4.22.4",
     "typescript": "~5.8.3"
   }

@@ -1,0 +1,12 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M226 286C226 217.516 281.516 162 350 162H674C742.484 162 798 217.516 798 286V508C798 576.484 742.484 632 674 632H550L407 775C387.479 794.521 354 780.694 354 753.083V632H350C281.516 632 226 576.484 226 508V286Z" fill="#FFFDF8"/>
+  <circle cx="390" cy="391" r="57" fill="#F5A524"/>
+  <circle cx="512" cy="391" r="57" fill="#94B7A5"/>
+  <circle cx="634" cy="391" r="57" fill="#F5A524"/>
+  <path d="M512 284V509" stroke="#0B3D2E" stroke-width="38" stroke-linecap="round"/>
+  <path d="M455 338H569" stroke="#0B3D2E" stroke-width="32" stroke-linecap="round"/>
+  <path d="M455 454H569" stroke="#0B3D2E" stroke-width="32" stroke-linecap="round"/>
+  <path d="M681 694C681 635.458 728.458 588 787 588C845.542 588 893 635.458 893 694C893 752.542 845.542 800 787 800C728.458 800 681 752.542 681 694Z" fill="#F5A524"/>
+  <path d="M769 657C774.381 642.741 787.834 633 805.5 633C828.972 633 846 648.632 846 669.5C846 687.932 834.633 699.266 819.406 708.228C805.432 716.453 797 724.186 797 740" stroke="#0B3D2E" stroke-width="30" stroke-linecap="round"/>
+  <path d="M797 778H797.5" stroke="#0B3D2E" stroke-width="34" stroke-linecap="round"/>
+</svg>

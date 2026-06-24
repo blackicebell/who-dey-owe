@@ -5,7 +5,9 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icons/app-icon-1024.png",
     "splash": {
+      "image": "./assets/icons/splash-icon-1024.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAF8F1"
     },
@@ -17,7 +19,14 @@
       "bundleIdentifier": "com.blackicebell.whodeyowe"
     },
     "android": {
-      "package": "com.blackicebell.whodeyowe"
+      "package": "com.blackicebell.whodeyowe",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/adaptive-icon-foreground-1024.png",
+        "backgroundColor": "#0B3D2E"
+      }
+    },
+    "web": {
+      "favicon": "./assets/icons/favicon-48.png"
     },
     "scheme": "whodeyowe"
   }
