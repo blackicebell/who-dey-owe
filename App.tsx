@@ -585,6 +585,7 @@ function CustomerDetail({
   onEditDebt: (debt: Debt) => void;
   onDeleteDebt: (debt: Debt) => void;
 }) {
+  const [detailTab, setDetailTab] = useState<'Debts' | 'Payments'>('Debts');
   const debts = data.debts.filter((debt) => debt.customerId === customer.id).map(normalizeDebt);
   const payments = data.payments.filter((payment) => payment.customerId === customer.id);
   const lastPayment = payments[0]?.paymentDate ? formatShortDate(payments[0].paymentDate) : 'No payment yet';
@@ -619,7 +620,23 @@ function CustomerDetail({
         <Button label="Send WhatsApp Reminder" icon="logo-whatsapp" variant="ghost" onPress={() => openWhatsAppReminder(customer, data.settings)} style={styles.gridButton} />
       </View>
 
-      <SectionTitle title="Debts" />
+      <View style={styles.detailTabs}>
+        {(['Debts', 'Payments'] as const).map((tab) => {
+          const active = detailTab === tab;
+          const count = tab === 'Debts' ? debts.length : payments.length;
+          return (
+            <Pressable key={tab} onPress={() => setDetailTab(tab)} style={[styles.detailTab, active && styles.detailTabActive]}>
+              <Text style={[styles.detailTabText, active && styles.detailTabTextActive]}>{tab}</Text>
+              <View style={[styles.detailTabCount, active && styles.detailTabCountActive]}>
+                <Text style={[styles.detailTabCountText, active && styles.detailTabCountTextActive]}>{count}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {detailTab === 'Debts' ? (
+      <>
       {debts.length ? debts.map((debt) => (
         <DebtDetailCard
           key={debt.id}
@@ -628,8 +645,11 @@ function CustomerDetail({
           onDelete={() => onDeleteDebt(debt)}
         />
       )) : <EmptyInline title="No debt yet" body="Add what this customer owes and it will appear here." />}
+      </>
+      ) : null}
 
-      <SectionTitle title="Payment History" />
+      {detailTab === 'Payments' ? (
+      <>
       {payments.length ? payments.map((payment) => {
         const debt = data.debts.find((item) => item.id === payment.debtId);
         return (
@@ -640,6 +660,8 @@ function CustomerDetail({
           </Card>
         );
       }) : <EmptyInline title="No payment yet" body="Partial and full payments will show here." />}
+      </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -1687,6 +1709,57 @@ const styles = StyleSheet.create({
   gridButton: {
     flexGrow: 1,
     flexBasis: '45%'
+  },
+  detailTabs: {
+    minHeight: 54,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 5,
+    flexDirection: 'row',
+    gap: 6,
+    ...shadows.card
+  },
+  detailTab: {
+    flex: 1,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 10
+  },
+  detailTabActive: {
+    backgroundColor: colors.green
+  },
+  detailTabText: {
+    color: colors.charcoal,
+    fontSize: 14,
+    fontFamily: fonts.extraBold
+  },
+  detailTabTextActive: {
+    color: colors.white
+  },
+  detailTabCount: {
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.greenMist,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8
+  },
+  detailTabCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.18)'
+  },
+  detailTabCountText: {
+    color: colors.green,
+    fontSize: 12,
+    fontFamily: fonts.extraBold
+  },
+  detailTabCountTextActive: {
+    color: colors.white
   },
   emptyCard: {
     gap: 12,
